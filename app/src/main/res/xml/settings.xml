@@ -1,0 +1,37 @@
+<?xml version="1.0" encoding="utf-8"?>
+<PreferenceScreen xmlns:android="http://schemas.android.com/apk/res/android">
+
+
+        <SwitchPreferenceCompat
+                android:key="notifications"
+                android:defaultValue="true"
+                android:title="Enable message notifications"/>
+
+        <EditTextPreference
+                android:key="seed_address"
+                android:defaultValue="192.168.0.1:21000"
+                android:title="Cluster seed adress"/>
+
+        <EditTextPreference
+                android:key="c1_address"
+                android:defaultValue="192.168.0.1:21000"
+                android:title="Cluster c1 adress"/>
+
+        <EditTextPreference
+                android:key="c2_address"
+                android:defaultValue="192.168.0.1:21000"
+                android:title="Cluster c2 adress"/>
+
+        <EditTextPreference
+               android:key="listenport"
+                android:defaultValue="55555"
+                android:title="Listening port"/>
+
+
+        <Preference
+                android:key="ipadress"
+                android:title="Send feedback"
+                android:defaultValue="0"
+                android:summary="Report technical issues or suggest new features"/>
+
+</PreferenceScreen>
