@@ -13,9 +13,4 @@
           android:onClick="onClickConnect"
           app:showAsAction="ifRoom"/>
 
-    <item android:id="@+id/action_send_message"
-          android:title="@string/action_send"
-          android:orderInCategory="100"
-          android:onClick="onClickSend"
-          app:showAsAction="ifRoom"/>
 </menu>

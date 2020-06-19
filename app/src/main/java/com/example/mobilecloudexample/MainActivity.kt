@@ -15,45 +15,35 @@ import android.util.Log
 import android.view.Menu
 import android.view.MenuItem
 import android.view.View
-import android.widget.EditText
 import android.widget.SeekBar
 import androidx.appcompat.app.AppCompatActivity
 import androidx.preference.PreferenceManager
 
 import kotlinx.android.synthetic.main.activity_main.*
 import kotlinx.android.synthetic.main.content_main.*
-import org.json.JSONException
-import org.json.JSONObject
-import java.io.*
-import java.lang.Exception
-
-import java.net.InetSocketAddress
-
-import kotlin.text.toInt
-import java.net.Socket
-import kotlin.concurrent.thread
+import java.util.concurrent.Executors
+import java.util.concurrent.TimeUnit
 
 
 class MainActivity : AppCompatActivity() {
-    var conL : ConstraintLayout? = null
-    var toggle : Boolean = true
-    var socket : Socket? = null
-    var connection : Connection? = null
+    var conL: ConstraintLayout? = null
+    var toggle: Boolean = true
 
-    val imPaint : Paint = Paint(Paint.ANTI_ALIAS_FLAG)
-    val imPaintW : Paint = Paint(Paint.ANTI_ALIAS_FLAG)
-    var imB : Bitmap? = null
-    var imCanvas : Canvas? = null
-    val s = State(-1.0f, -1.0f)
+    val imPaint: Paint = Paint(Paint.ANTI_ALIAS_FLAG)
+    val imPaintW: Paint = Paint(Paint.ANTI_ALIAS_FLAG)
+    var imB: Bitmap? = null
+    var imCanvas: Canvas? = null
+    private val s = State(-1.0f, -1.0f)
+    var clientId : String? = null
 
-
-    var clusterConnection : ClusterConnection? = null
+    var clusterConnection: ClusterConnection? = null
 
 
     class State(var x: Float, var y: Float)
 
 
-    class MySeekerListener(val clName : String, val callback: (String, Int) -> Unit) : SeekBar.OnSeekBarChangeListener {
+
+    class MySeekerListener(private val clName : String, private val callback: (String, Int) -> Unit) : SeekBar.OnSeekBarChangeListener {
         override fun onProgressChanged(seekBar: SeekBar?, progress: Int, fromUser: Boolean) {
         }
 
@@ -62,7 +52,8 @@ class MainActivity : AppCompatActivity() {
         }
 
         override fun onStopTrackingTouch(seekBar: SeekBar?) {
-            callback.invoke(clName, seekBar?.progress!!)
+
+            callback.invoke(clName, scaledProgress(seekBar?.progress!!))
         }
     }
 
@@ -71,7 +62,8 @@ class MainActivity : AppCompatActivity() {
         setContentView(R.layout.activity_main)
         setSupportActionBar(toolbar)
 
-        val sp : SharedPreferences = PreferenceManager.getDefaultSharedPreferences(this)
+//        text_send.
+        text_send.setText("Not connected")
 
         conL = findViewById(R.id.content_main)
 
@@ -90,37 +82,41 @@ class MainActivity : AppCompatActivity() {
 
         val d = imageView.drawable
         imB = Bitmap.createBitmap(d.intrinsicWidth, d.intrinsicHeight, Bitmap.Config.ARGB_8888)
-        imCanvas = Canvas(imB)
+        imCanvas = Canvas(imB!!)
+        Log.i("conns", "w".plus(d.intrinsicWidth).plus("s").plus(d.intrinsicHeight))
 
 
-        val b : HashMap<String, Pair<String, Int>> = hashMapOf()
+
+        val messageListener : (String?) -> Unit = {m  -> publishMessage(m!!)}
+        val clientIdListener : (String?) -> Unit = {m  ->
+            this.clientId = m
+        }
+        val connListener : (String) -> Unit = {m -> text_send.text = m }
+        clusterConnection = ClusterConnection(hashMapOf(
+            Pair("seed", scaledProgress(seedBar.progress)),
+            Pair("c1", scaledProgress(c1Bar.progress)),
+            Pair("c2", scaledProgress(c2Bar.progress))
+        ), messageListener, clientIdListener, connListener)
+
+        val sp : SharedPreferences = PreferenceManager.getDefaultSharedPreferences(this)
+        val b : HashMap<String, Pair<String, Int>> = HashMap()
         arrayOf("seed", "c1", "c2").forEach { s ->
             val p = parseHostPortFromString(sp.getString(s.plus("_address"), "localhost:80")!!)
+            Log.i("conns", s.plus(p.toString()))
             b[s] = p
         }
 
+        val scheduler = Executors.newSingleThreadScheduledExecutor()
 
-        clusterConnection = ClusterConnection(socket, hashMapOf(
-            Pair("seed", seedBar.progress),
-            Pair("c1", c1Bar.progress),
-            Pair("c2", c2Bar.progress)
-        ), b)
-
-
+        scheduler.scheduleAtFixedRate({
+            Log.i("messr", "Reconnecting? " + clientId)
+            clusterConnection?.reconnectToClosest(clientId!!, b)
+        }, 10, 10, TimeUnit.SECONDS)
 
         seedBar.setOnSeekBarChangeListener(MySeekerListener("seed", clusterConnection!!::onLatencyChange))
         c1Bar.setOnSeekBarChangeListener(MySeekerListener("c1", clusterConnection!!::onLatencyChange))
         c2Bar.setOnSeekBarChangeListener(MySeekerListener("c2",  clusterConnection!!::onLatencyChange))
 
-//         c1bar.setOnSeekBarChangeListener(MySeekerListener("seed"){ s: String, v : Int ->  latencyState!!.onLatencyChanged(s, v)}
-//        c2bar.setOnSeekBarChangeListener(MySeekerListener("seed"){ s: String, v : Int ->  latencyState!!.onLatencyChanged(s, v)}
-//            .setOnSeekBarChangeListener(MySeekerListener("c1", latencyState!!::onLatencyChanged)
-//        seedBar.setOnSeekBarChangeListener(MySeekerListener("c2", latencyState!!::onLatencyChanged)
-
-
-
-
-//
         fab.setOnClickListener(this::onMailClick)
 
 
@@ -128,36 +124,25 @@ class MainActivity : AppCompatActivity() {
 
     override fun onDestroy() {
         super.onDestroy()
-        socket?.close()
+        clusterConnection?.destroy()
     }
 
+    @SuppressWarnings("UNUSED_PARAMETER")
     fun onClickMenu(view: MenuItem) {
         val intent = Intent(this, SettingsActivity::class.java)
         startActivity(intent)
     }
 
     fun onClickConnect(view: MenuItem) {
-        if(socket != null && socket!!.isConnected) return
         val sp : SharedPreferences = PreferenceManager.getDefaultSharedPreferences(this)
-
-        val address : List<String> = sp.getString("address", "localhost:1234").split(':')
-
-        val ipaddress : String = address.get(0)
-        val port : Int = address.get(1).toInt()
-        val lport = sp.getString("listenport", "55555").toInt()
-        val saddr = InetSocketAddress(ipaddress, port)
-        thread {
-            try {
-                connection = Connection(saddr, InetSocketAddress(lport)){ m -> publishMessage(m!!)}
-
-                connection?.initConnection()
-            } catch (e : IOException) {
-                Log.e("mapp", "can't connect!")
-                Log.e("mapp", e.message)
-            } catch (e: Exception) {
-                Log.e("mapp", e.message)
-            }
+        val b : HashMap<String, Pair<String, Int>> = hashMapOf()
+        arrayOf("seed", "c1", "c2").forEach { s ->
+            val p = parseHostPortFromString(sp.getString(s.plus("_address"), "localhost:80")!!)
+            Log.i("conns", s.plus(p.toString()))
+            b[s] = p
         }
+        clusterConnection?.connectToClosest(b)
+
     }
 
 
@@ -179,53 +164,6 @@ class MainActivity : AppCompatActivity() {
                 imageView.setImageBitmap(imB)
             }
 
-        }
-    }
-
-
-    fun receiveLoop() {
-        val ist : InputStream? = socket?.getInputStream()
-        Log.i("mappr", "here2 + " + (ist == null))
-
-
-        Log.i("mappr", "here3")
-        val isr : InputStreamReader? = InputStreamReader(ist)
-        val istr : BufferedReader? = BufferedReader(isr)
-        Log.i("mappr", "here4 " + (istr == null))
-
-
-        while(true) {
-            val res = istr?.readLine()
-            try {
-                val js = JSONObject(res)
-//                val uname = js.getString("username")
-                publishMessage(res!!)
-            } catch (e: JSONException ) {
-                Log.e("mappr", e.message)
-            }
-            Log.i("mappr", res)
-        }
-
-
-    }
-
-
-
-    fun onClickSend(view: MenuItem) {
-        val mes : String? = findViewById<EditText>(R.id.text_send).text.toString()
-        Log.i("mapp", "$mes")
-
-        thread {
-            try {
-                val ostr = socket?.getOutputStream()?.writer()
-                ostr?.write(mes)
-                ostr?.flush()
-//                ostr?.flush()
-            } catch (e: IOException) {
-                Log.i("blah", e.message)
-            }
-            Log.i("messr", socket?.getInputStream()?.available().toString())
-//            receiveLoop()
         }
     }
 

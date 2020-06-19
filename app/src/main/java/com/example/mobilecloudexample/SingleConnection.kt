@@ -11,9 +11,8 @@ import java.lang.Exception
 import java.net.*
 import kotlin.concurrent.thread
 
-class Connection(mainaddr : InetSocketAddress, listenAddr : InetSocketAddress, listener: (mess: String?) -> Unit) {
+class SingleConnection(mainaddr : InetSocketAddress, listener: (mess: String?) -> Unit) {
     private val maddr = mainaddr
-    private val listenaddr = listenAddr
     private var socket : Socket? = null
     private var clId : String? = null
     private val listener = listener
@@ -23,17 +22,24 @@ class Connection(mainaddr : InetSocketAddress, listenAddr : InetSocketAddress, l
 
     public fun initConnection() {
         try {
-            socket = Socket(maddr.address, maddr.port)
+            Log.i("messc", maddr.hostName)
+            Log.i("messc", maddr.port.toString())
+            socket = Socket(maddr.hostName, maddr.port)
             Log.i("messc", socket?.isConnected.toString())
-            waitForInfo()
+
         } catch (e: Exception) {
             Log.e("messs", e.message)
             Log.e("messs", e.stackTrace.toString())
         }
     }
 
+    public fun getLine() : String? {
+        val istr: BufferedReader? = BufferedReader(InputStreamReader(socket?.getInputStream()))
+        return istr?.readLine()
+    }
 
-    private fun waitForInfo() {
+
+    public fun waitForConnectionInfoAndStartListening(latency : Int) {
         val istr: BufferedReader? = BufferedReader(InputStreamReader(socket?.getInputStream()))
 
        val res = istr?.readLine()
@@ -44,10 +50,9 @@ class Connection(mainaddr : InetSocketAddress, listenAddr : InetSocketAddress, l
             clId = clientId
             Log.i("messc", clientId)
             val jsm = JSONObject()
-            jsm.put("address", maddr.hostName)
-            jsm.put("port", listenaddr.port)
-            sendInfo(jsm.toString(), socket)
-//            socket?.close()
+            jsm.put("latency", latency)
+            jsm.put("command", "init")
+            writeInfo(jsm.toString())
             startListening()
         } catch (e: JSONException) {
             Log.e("mappr", e.message)
@@ -56,34 +61,33 @@ class Connection(mainaddr : InetSocketAddress, listenAddr : InetSocketAddress, l
 
     }
 
-    private fun startListening() {
-        thread {
-            try {
-//                listenSocket = ServerSocket(listenaddr.port)
-//                socket = listenSocket?.accept()
-                Log.i("messl", "Accepted!")
-                readFromSocket()
+    public fun connected() : Boolean {
+        return socket != null && socket!!.isConnected
+    }
+
+
+    public fun startListening() {
+        val istr = socket?.getInputStream()
+        istr.use {
+            try{
+                val bistr: BufferedReader? = BufferedReader(InputStreamReader(istr))
+                while (socket != null && socket!!.isConnected) {
+                    val res = bistr?.readLine()
+                    listener.invoke(res)
+                }
             } catch (e: Exception) {
-                Log.e("messl", e.message)
+                Log.e("mapps", e.message)
             }
         }
     }
 
-    private fun readFromSocket() {
-        try {
-            val istr: BufferedReader? = BufferedReader(InputStreamReader(socket?.getInputStream()))
-            while (true) {
-                val res = istr?.readLine()
-                listener.invoke(res)
-            }
-        } catch (e: Exception) {
-            Log.e("mapps", e.message)
-        }
+
+    public fun destroy() {
+        socket?.close()
     }
 
 
-
-    private fun sendInfo(mess: String, socket: Socket?) {
+    public fun writeInfo(mess: String) {
         try {
             val ostr = socket?.getOutputStream()?.writer()
             ostr?.write(mess)

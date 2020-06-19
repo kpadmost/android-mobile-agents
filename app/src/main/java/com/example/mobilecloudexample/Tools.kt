@@ -7,3 +7,7 @@ public fun parseHostPortFromString(str : String) : Pair<String, Int> {
     val sp = str.split(':')
     return Pair(sp[0], sp[1].toInt())
 }
+
+public fun scaledProgress(progress: Int, upped : Int = 600, lower : Int = 50) : Int {
+    return ((progress / 100.0) * (upped - lower) + lower).toInt()
+}

@@ -19,7 +19,7 @@
             app:layout_constraintTop_toTopOf="parent"
             app:layout_constraintBottom_toTopOf="@id/text_send"
             />
-    <EditText
+    <TextView
             android:layout_width="fill_parent"
             android:layout_height="wrap_content"
             android:id="@+id/text_send"
@@ -31,7 +31,7 @@
 
         <!--app:layout_constraintBottom_toBottomOf="parent">-->
 
-    </EditText>
+    </TextView>
     <LinearLayout
             android:orientation="vertical"
             android:layout_width="fill_parent"
@@ -43,12 +43,12 @@
     >
         <SeekBar
                 android:layout_width="match_parent"
-                android:layout_height="wrap_content" android:id="@+id/seedBar" android:progress="0"/>
+                android:layout_height="wrap_content" android:id="@+id/seedBar" android:progress="70"/>
         <SeekBar
-                android:layout_width="match_parent"
+                android:layout_width="match_parent" android:progress="100"
                 android:layout_height="wrap_content" android:id="@+id/c1Bar"/>
         <SeekBar
-                android:layout_width="match_parent"
+                android:layout_width="match_parent" android:progress="100"
                 android:layout_height="wrap_content" android:id="@+id/c2Bar"/>
     </LinearLayout>
 

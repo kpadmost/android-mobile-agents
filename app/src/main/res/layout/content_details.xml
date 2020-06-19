@@ -16,17 +16,20 @@
             android:src="@drawable/anak"
             android:id="@+id/imageView"
             app:layout_constraintStart_toStartOf="parent"
+            app:layout_constraintTop_toTopOf="parent"
             app:layout_constraintBottom_toTopOf="@id/seekers"
             />
 
-    <EditText
+    <TextView
             android:layout_width="fill_parent"
             android:layout_height="wrap_content"
             android:id="@+id/text_send"
             android:visibility="gone"
+            app:layout_constraintStart_toStartOf="parent"
+            app:layout_constraintBottom_toBottomOf="parent"
             >
 
-    </EditText>
+    </TextView>
 
     <LinearLayout
             android:orientation="vertical"
