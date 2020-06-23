@@ -7,4 +7,6 @@
     <string name="connp">8881</string>
     <string name="not_connected">Not connected</string>
     <string name="action_saveid">Save client id</string>
+    <string name="null_clientid">xxx</string>
+    <string name="client_id">client_id</string>
 </resources>

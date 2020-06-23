@@ -30,18 +30,17 @@ import java.util.concurrent.TimeUnit
 class MainActivity : AppCompatActivity() {
     var conL: ConstraintLayout? = null
     var toggle: Boolean = true
-
     val imPaint: Paint = Paint(Paint.ANTI_ALIAS_FLAG)
     val imPaintW: Paint = Paint(Paint.ANTI_ALIAS_FLAG)
     var imB: Bitmap? = null
     var imCanvas: Canvas? = null
-    private val s = State(-1.0f, -1.0f)
+
+    var firstConnected = false
     var clientId : String? = null
 
     private var clusterConnection: ExecutionManager? = null
 
 
-    class State(var x: Float, var y: Float)
 
 
 
@@ -64,32 +63,15 @@ class MainActivity : AppCompatActivity() {
         setContentView(R.layout.activity_main)
         setSupportActionBar(toolbar)
 
-//        text_send.
-        text_send.text = getString(R.string.not_connected)
+        initPainting()
+        initConnectionsInfo()
 
-        conL = findViewById(R.id.content_main)
-
-
-        imPaint.color = Color.BLACK
-        imPaint.strokeWidth = 10.0f
-        imPaint.isDither = false
+        fab.setOnClickListener(this::onMailClick)
 
 
+    }
 
-        imPaintW.color = Color.BLACK
-        imPaintW.strokeWidth = 15f
-        imPaintW.textSize = 60f
-        imPaintW.isDither = true
-
-
-
-        val d = imageView.drawable
-        imB = Bitmap.createBitmap(d.intrinsicWidth, d.intrinsicHeight, Bitmap.Config.ARGB_8888)
-        imCanvas = Canvas(imB!!)
-        Log.i("conns", "w".plus(d.intrinsicWidth).plus("s").plus(d.intrinsicHeight))
-
-
-
+    private fun initConnectionsInfo() {
         val messageListener : (String?) -> Unit = {m  -> publishMessage(m!!)}
         val clientIdListener : (String?) -> Unit = {m  ->
             this.clientId = m
@@ -114,7 +96,7 @@ class MainActivity : AppCompatActivity() {
         val scheduler = Executors.newSingleThreadScheduledExecutor()
 
         scheduler.scheduleAtFixedRate({
-
+            if(!firstConnected) return@scheduleAtFixedRate
             try {
                 runOnUiThread {
                     Toast.makeText(this, "Reconnecting...", Toast.LENGTH_SHORT).show();
@@ -131,9 +113,31 @@ class MainActivity : AppCompatActivity() {
         c1Bar.setOnSeekBarChangeListener(MySeekerListener("c1", clusterConnection!!::onLatencyChange))
         c2Bar.setOnSeekBarChangeListener(MySeekerListener("c2",  clusterConnection!!::onLatencyChange))
 
-        fab.setOnClickListener(this::onMailClick)
+    }
+
+    private fun initPainting() {
+        text_send.text = getString(R.string.not_connected)
+
+        conL = findViewById(R.id.content_main)
 
 
+        imPaint.color = Color.BLACK
+        imPaint.strokeWidth = 10.0f
+        imPaint.isDither = false
+
+
+
+        imPaintW.color = Color.BLACK
+        imPaintW.strokeWidth = 15f
+        imPaintW.textSize = 60f
+        imPaintW.isDither = true
+
+
+
+        val d = imageView.drawable
+        imB = Bitmap.createBitmap(d.intrinsicWidth, d.intrinsicHeight, Bitmap.Config.ARGB_8888)
+        imCanvas = Canvas(imB!!)
+        Log.i("conns", "w".plus(d.intrinsicWidth).plus("s").plus(d.intrinsicHeight))
     }
 
     override fun onDestroy() {
@@ -154,6 +158,7 @@ class MainActivity : AppCompatActivity() {
 
     @Suppress("UNUSED_PARAMETER")
     fun onClickConnect(view: MenuItem) {
+        firstConnected = true
         val sp : SharedPreferences = PreferenceManager.getDefaultSharedPreferences(this)
 
         val lataddr = parseHostPortFromString(sp.getString("latency_address", "192.168.0.101:21003")!!)
@@ -166,15 +171,16 @@ class MainActivity : AppCompatActivity() {
             Log.i("conns", s.plus(p.toString()))
             b[s] = p
         }
-        val client_id = sp.getString("client_id", "xxx")
-        if(client_id.startsWith("xxx"))
+        val clientId = sp.getString(getString(R.string.client_id), getString(R.string.null_clientid))!!
+        if(clientId.startsWith(getString(R.string.null_clientid)))
             clusterConnection?.connectToClosest(b)
         else
-            clusterConnection?.connectToClosest(b, client_id!!)
+            clusterConnection?.connectToClosest(b, clientId)
     }
 
 
     private fun publishMessage(message: String) {
+        // parsing board params
         val sp = message.split(':')
         val x = sp[0].toFloat()
         val y = sp[1].toFloat()
@@ -186,17 +192,7 @@ class MainActivity : AppCompatActivity() {
             imCanvas?.drawRect(x, y, x + 50f, y + 50f, imPaint)
             imCanvas?.drawText(c, 50f, 50f, imPaintW)
             imageView.setImageBitmap(imB)
-//            if(s.x < 0f) {
-//                s.x = x
-//                s.y = y
-//                imCanvas?.drawRect(x, y, x + 50f, y + 50f, imPaint)
-//            } else {
-//                imCanvas?.drawRect(s.x, s.y, s.x + 50f, s.y + 50f, imPaintW)
-//                imCanvas?.drawRect(x, y, x + 50f, y + 50f, imPaint)
-//                s.x = x
-//                s.y = y
-//                imageView.setImageBitmap(imB)
-//            }
+
 
         }
     }
