@@ -21,6 +21,7 @@ import androidx.preference.PreferenceManager
 
 import kotlinx.android.synthetic.main.activity_main.*
 import kotlinx.android.synthetic.main.content_main.*
+import java.lang.Exception
 import java.util.concurrent.Executors
 import java.util.concurrent.TimeUnit
 
@@ -36,7 +37,7 @@ class MainActivity : AppCompatActivity() {
     private val s = State(-1.0f, -1.0f)
     var clientId : String? = null
 
-    var clusterConnection: ClusterConnection? = null
+    private var clusterConnection: ExecutionManager? = null
 
 
     class State(var x: Float, var y: Float)
@@ -53,7 +54,7 @@ class MainActivity : AppCompatActivity() {
 
         override fun onStopTrackingTouch(seekBar: SeekBar?) {
 
-            callback.invoke(clName, scaledProgress(seekBar?.progress!!))
+            callback(clName, scaledProgress(seekBar?.progress!!))
         }
     }
 
@@ -63,7 +64,7 @@ class MainActivity : AppCompatActivity() {
         setSupportActionBar(toolbar)
 
 //        text_send.
-        text_send.setText("Not connected")
+        text_send.text = getString(R.string.not_connected)
 
         conL = findViewById(R.id.content_main)
 
@@ -74,9 +75,10 @@ class MainActivity : AppCompatActivity() {
 
 
 
-        imPaintW.color = Color.WHITE
-        imPaint.strokeWidth = 10.0f
-        imPaint.isDither = false
+        imPaintW.color = Color.BLACK
+        imPaintW.strokeWidth = 15f
+        imPaintW.textSize = 38f
+        imPaintW.isDither = true
 
 
 
@@ -92,13 +94,14 @@ class MainActivity : AppCompatActivity() {
             this.clientId = m
         }
         val connListener : (String) -> Unit = {m -> text_send.text = m }
-        clusterConnection = ClusterConnection(hashMapOf(
+        clusterConnection = ExecutionManager(hashMapOf(
             Pair("seed", scaledProgress(seedBar.progress)),
             Pair("c1", scaledProgress(c1Bar.progress)),
             Pair("c2", scaledProgress(c2Bar.progress))
         ), messageListener, clientIdListener, connListener)
 
         val sp : SharedPreferences = PreferenceManager.getDefaultSharedPreferences(this)
+        clientId = sp.getString("client_id", "xxx")
         val b : HashMap<String, Pair<String, Int>> = HashMap()
         arrayOf("seed", "c1", "c2").forEach { s ->
             val p = parseHostPortFromString(sp.getString(s.plus("_address"), "localhost:80")!!)
@@ -106,12 +109,19 @@ class MainActivity : AppCompatActivity() {
             b[s] = p
         }
 
+
         val scheduler = Executors.newSingleThreadScheduledExecutor()
 
         scheduler.scheduleAtFixedRate({
-            Log.i("messr", "Reconnecting? " + clientId)
-            clusterConnection?.reconnectToClosest(clientId!!, b)
-        }, 10, 10, TimeUnit.SECONDS)
+
+            try {
+                Log.i("messr", "Reconnecting? " + clientId)
+                clusterConnection?.reconnectToClosest(clientId!!, b)
+            } catch (e : Exception) {
+                Log.e("messr", "exception while reconnecting")
+                e.printStackTrace()
+            }
+        }, 8, 15, TimeUnit.SECONDS)
 
         seedBar.setOnSeekBarChangeListener(MySeekerListener("seed", clusterConnection!!::onLatencyChange))
         c1Bar.setOnSeekBarChangeListener(MySeekerListener("c1", clusterConnection!!::onLatencyChange))
@@ -124,49 +134,70 @@ class MainActivity : AppCompatActivity() {
 
     override fun onDestroy() {
         super.onDestroy()
-        clusterConnection?.destroy()
+        clusterConnection?.destroyAll()
     }
 
-    @SuppressWarnings("UNUSED_PARAMETER")
+    @Suppress("UNUSED_PARAMETER")
     fun onClickMenu(view: MenuItem) {
         val intent = Intent(this, SettingsActivity::class.java)
         startActivity(intent)
     }
 
+    fun onClicksaveid(view : MenuItem) {
+        val sp : SharedPreferences = PreferenceManager.getDefaultSharedPreferences(this)
+        sp.edit().putString("client_id", this.clientId).apply()
+    }
+
+    @Suppress("UNUSED_PARAMETER")
     fun onClickConnect(view: MenuItem) {
         val sp : SharedPreferences = PreferenceManager.getDefaultSharedPreferences(this)
+
+        val lataddr = parseHostPortFromString(sp.getString("latency_address", "192.168.0.101:21003")!!)
+        clusterConnection?.connectForLatency(lataddr)
+
+
         val b : HashMap<String, Pair<String, Int>> = hashMapOf()
         arrayOf("seed", "c1", "c2").forEach { s ->
             val p = parseHostPortFromString(sp.getString(s.plus("_address"), "localhost:80")!!)
             Log.i("conns", s.plus(p.toString()))
             b[s] = p
         }
-        clusterConnection?.connectToClosest(b)
-
+        val client_id = sp.getString("client_id", "xxx")
+        if(client_id.startsWith("xxx"))
+            clusterConnection?.connectToClosest(b)
+        else
+            clusterConnection?.connectToClosest(b, client_id!!)
     }
 
 
-    fun publishMessage(message: String) {
+    private fun publishMessage(message: String) {
         val sp = message.split(':')
         val x = sp[0].toFloat()
         val y = sp[1].toFloat()
+        val c = "counter " + sp[2].toInt()
+        val d = imageView.drawable ?: return
         imageView.post {
-
-            if(s.x < 0f) {
-                s.x = x
-                s.y = y
-                imCanvas?.drawRect(x, y, x + 50f, y + 50f, imPaint)
-            } else {
-                imCanvas?.drawRect(s.x, s.y, s.x + 50f, s.y + 50f, imPaintW)
-                imCanvas?.drawRect(x, y, x + 50f, y + 50f, imPaint)
-                s.x = x
-                s.y = y
-                imageView.setImageBitmap(imB)
-            }
+            imB = Bitmap.createBitmap(d.intrinsicWidth, d.intrinsicHeight, Bitmap.Config.ARGB_8888)
+            imCanvas = Canvas(imB!!)
+            imCanvas?.drawRect(x, y, x + 50f, y + 50f, imPaint)
+            imCanvas?.drawText(c, 50f, 50f, imPaintW)
+            imageView.setImageBitmap(imB)
+//            if(s.x < 0f) {
+//                s.x = x
+//                s.y = y
+//                imCanvas?.drawRect(x, y, x + 50f, y + 50f, imPaint)
+//            } else {
+//                imCanvas?.drawRect(s.x, s.y, s.x + 50f, s.y + 50f, imPaintW)
+//                imCanvas?.drawRect(x, y, x + 50f, y + 50f, imPaint)
+//                s.x = x
+//                s.y = y
+//                imageView.setImageBitmap(imB)
+//            }
 
         }
     }
 
+    @Suppress("UNUSED_PARAMETER")
     fun onMailClick(view : View) {
         // connecting to the server
 
@@ -183,7 +214,7 @@ class MainActivity : AppCompatActivity() {
         return true
     }
 
-    fun animation(t : Boolean) {
+    private fun animation(t : Boolean) {
         val v : View = findViewById(R.id.seekers)
         val vis : Int = v.visibility
         Log.i("mapp", "$vis")

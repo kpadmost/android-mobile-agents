@@ -62,7 +62,7 @@ class SingleConnection(mainaddr : InetSocketAddress, listener: (mess: String?) -
     }
 
     public fun connected() : Boolean {
-        return socket != null && socket!!.isConnected
+        return socket != null && socket!!.isConnected && !socket!!.isClosed
     }
 
 
@@ -77,6 +77,7 @@ class SingleConnection(mainaddr : InetSocketAddress, listener: (mess: String?) -
                 }
             } catch (e: Exception) {
                 Log.e("mapps", e.message)
+                e.printStackTrace()
             }
         }
     }

@@ -13,4 +13,10 @@
           android:onClick="onClickConnect"
           app:showAsAction="ifRoom"/>
 
+    <item android:id="@+id/action_saveid"
+          android:title="@string/action_saveid"
+          android:orderInCategory="100"
+          android:onClick="onClicksaveid"
+          app:showAsAction="ifRoom"/>
+
 </menu>
