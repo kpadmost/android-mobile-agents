@@ -16,6 +16,7 @@ import android.view.Menu
 import android.view.MenuItem
 import android.view.View
 import android.widget.SeekBar
+import android.widget.Toast
 import androidx.appcompat.app.AppCompatActivity
 import androidx.preference.PreferenceManager
 
@@ -77,7 +78,7 @@ class MainActivity : AppCompatActivity() {
 
         imPaintW.color = Color.BLACK
         imPaintW.strokeWidth = 15f
-        imPaintW.textSize = 38f
+        imPaintW.textSize = 60f
         imPaintW.isDither = true
 
 
@@ -115,7 +116,10 @@ class MainActivity : AppCompatActivity() {
         scheduler.scheduleAtFixedRate({
 
             try {
-                Log.i("messr", "Reconnecting? " + clientId)
+                runOnUiThread {
+                    Toast.makeText(this, "Reconnecting...", Toast.LENGTH_SHORT).show();
+                }
+
                 clusterConnection?.reconnectToClosest(clientId!!, b)
             } catch (e : Exception) {
                 Log.e("messr", "exception while reconnecting")

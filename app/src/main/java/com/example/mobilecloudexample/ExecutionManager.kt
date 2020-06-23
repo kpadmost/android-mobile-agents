@@ -112,8 +112,8 @@ class ExecutionManager (
                     val js = JSONObject()
                     js.put("node", s)
                     js.put("latency", l)
-                    latencyConnection?.writeInfo(js.toString())
                     connL("Connected to: ".plus(connected!!).plus(" latency: ").plus(latencies[connected!!]))
+                    latencyConnection?.writeInfo(js.toString())
                 } catch (e: Exception) {
                     Log.e("sendlch", e.toString())
                 }
